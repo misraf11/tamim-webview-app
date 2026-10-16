@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Quail</string>
+    <string name="no_internet">ইন্টারনেট সংযোগ নেই</string>
+    <string name="retry">আবার চেষ্টা করুন</string>
+</resources>
