@@ -1,4 +1,4 @@
-package com.misrafbd.quail;
+package com.misrafbd.tamim;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -11,6 +11,7 @@ import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.JavascriptInterface;
 import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -37,6 +38,44 @@ public class MainActivity extends AppCompatActivity {
 
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQUEST_CODE = 51426;
+
+    // Detects touches that start inside an inner scrollable element (a popup,
+    // bottom sheet, or modal with its own overflow scroll) and tells the
+    // Android side to disable SwipeRefreshLayout's pull-to-refresh for that
+    // gesture. Without this, scrolling inside a popup can be misread by
+    // SwipeRefreshLayout as a pull-to-refresh on the outer page, causing an
+    // unwanted reload that closes the popup.
+    private static final String NESTED_SCROLL_JS =
+            "(function(){" +
+            "if(window.__androidNestedScrollInstalled)return;" +
+            "window.__androidNestedScrollInstalled=true;" +
+            "function isScrollable(el){" +
+            "if(!el||el===document.body||el===document.documentElement)return false;" +
+            "var cs=window.getComputedStyle(el);" +
+            "var oy=cs.overflowY;" +
+            "return (oy==='auto'||oy==='scroll')&&el.scrollHeight>el.clientHeight+1;" +
+            "}" +
+            "function findScrollableAncestor(el){" +
+            "while(el&&el!==document.body&&el!==document.documentElement){" +
+            "if(isScrollable(el))return el;" +
+            "el=el.parentElement;" +
+            "}" +
+            "return null;" +
+            "}" +
+            "function report(v){try{if(window.AndroidNestedScroll){window.AndroidNestedScroll.setNestedScrollable(v);}}catch(e){}}" +
+            "document.addEventListener('touchstart',function(e){" +
+            "try{report(!!findScrollableAncestor(e.target));}catch(err){}" +
+            "},{capture:true,passive:true});" +
+            "document.addEventListener('touchend',function(){report(false);},{capture:true,passive:true});" +
+            "document.addEventListener('touchcancel',function(){report(false);},{capture:true,passive:true});" +
+            "})();";
+
+    private class NestedScrollInterface {
+        @JavascriptInterface
+        public void setNestedScrollable(final boolean scrollable) {
+            runOnUiThread(() -> swipeRefresh.setEnabled(!scrollable));
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -95,6 +134,8 @@ public class MainActivity extends AppCompatActivity {
             android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
         }
 
+        webView.addJavascriptInterface(new NestedScrollInterface(), "AndroidNestedScroll");
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -124,6 +165,8 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 progressBar.setVisibility(View.GONE);
                 swipeRefresh.setRefreshing(false);
+                swipeRefresh.setEnabled(true);
+                view.evaluateJavascript(NESTED_SCROLL_JS, null);
             }
 
             @Override
